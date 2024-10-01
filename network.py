@@ -353,34 +353,49 @@ class one_Layer(NeuralNetwork):
                 # Actualizar el umbral
                 self.graph.nodes[self.dimension]["threshold"] += expected_output
 
-    def train_adaline(self, X, y, epochs=10, learning_rate=0.1):
+    def train_adaline(self, X, y, epochs=10, learning_rate=0.1, tolerance=1e-5):
         """
-        Trains the neural network using the ADALINE learning rule.
+        Trains the neural network using the ADALINE learning rule with an early stopping condition.
         
         Parameters:
         X (ndarray): Training input data
         y (ndarray): Training output labels
         epochs (int): Number of training iterations
         learning_rate (float): The step size for weight updates
+        tolerance (float): The minimum change in weight to continue training
         """
         for epoch in range(epochs):
+            max_weight_change = 0  # Track the maximum weight change in this epoch
             for i in range(len(X)):
                 input_vector = X[i]
                 expected_output = y[i]
                 
                 # Compute the net input (weighted sum of inputs + threshold)
-                net_input = sum(self.graph[j][len(input_vector)]["weight"] * input_vector[j] for j in range(len(input_vector)))
-                net_input -= self.graph.nodes[self.dimension].get("threshold", 0)
+                net_input = self.evaluate(input_vector)
                 
                 # Compute the error
                 error = expected_output - net_input
                 
                 # Update weights and threshold using the ADALINE rule
                 for j in range(len(input_vector)):
-                    self.graph[j][len(input_vector)]["weight"] += learning_rate * error * input_vector[j]
+                    weight_update = learning_rate * error * input_vector[j]
+                    self.graph[j][len(input_vector)]["weight"] += weight_update
+                    
+                    # Track the maximum weight change
+                    max_weight_change = max(max_weight_change, abs(weight_update))
                     
                 # Update the threshold
-                self.graph.nodes[self.dimension]["threshold"] += learning_rate * error
+                threshold_update = learning_rate * error
+                self.graph.nodes[self.dimension]["threshold"] += threshold_update
+                
+                # Track the maximum threshold change
+                max_weight_change = max(max_weight_change, abs(threshold_update))
+            
+            # If the maximum change in weights or threshold is smaller than the tolerance, stop early
+            if max_weight_change < tolerance:
+                print(f"Training stopped early at epoch {epoch} due to small weight change.")
+                break
+
                 
                 
                 
