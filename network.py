@@ -331,28 +331,34 @@ class one_Layer(NeuralNetwork):
                 break
 
 
-    def train_hebbian(self, X, y, epochs=10):
+    def train_hebbian(self, X, y, decimal_precision=6):
         """
         Trains the neural network using the Hebbian learning rule.
         
         Parameters:
-        X_train (ndarray): Training input data
-        y_train (ndarray): Training output labels
-        epochs (int): Number of training iterations
+        X (ndarray): Training input data
+        y (ndarray): Training output labels
+        decimal_precision (int): The number of decimal places to round the weights to avoid floating-point precision errors.
         """
         
-        for epoch in range(epochs):
-            for i in range(len(X)):
-                input_vector = X[i]
-                expected_output = y[i]
+        for i in range(len(X)):
+            input_vector = X[i]
+            expected_output = y[i]
+            
+            # Update weights using Hebbian rule
+            for j in range(len(input_vector)):
+                self.graph[j][len(input_vector)]["weight"] += input_vector[j] * expected_output
                 
-                
-                for j in range(len(input_vector)):
-                    self.graph[j][len(input_vector)]["weight"] += input_vector[j]*expected_output
-                
-                # Actualizar el umbral
-                self.graph.nodes[self.dimension]["threshold"] += expected_output
+                # Round the weight to avoid numerical issues
+                self.graph[j][len(input_vector)]["weight"] = round(self.graph[j][len(input_vector)]["weight"], decimal_precision)
+            
+            # Update the threshold
+            self.graph.nodes[self.dimension]["threshold"] -= expected_output
+            
+            # Round the threshold to avoid numerical issues
+            self.graph.nodes[self.dimension]["threshold"] = round(self.graph.nodes[self.dimension]["threshold"], decimal_precision)
 
+    print("Training completed with Hebbian rule.")
     def train_adaline(self, X, y, epochs=10, learning_rate=0.1, tolerance=1e-5):
         """
         Trains the neural network using the ADALINE learning rule with an early stopping condition.
