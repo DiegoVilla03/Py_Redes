@@ -358,7 +358,9 @@ class one_Layer(NeuralNetwork):
             # Round the threshold to avoid numerical issues
             self.graph.nodes[self.dimension]["threshold"] = round(self.graph.nodes[self.dimension]["threshold"], decimal_precision)
 
-    print("Training completed with Hebbian rule.")
+        print("Training completed with Hebbian rule.")
+        
+
     def train_adaline(self, X, y, epochs=10, learning_rate=0.1, tolerance=1e-5):
         """
         Trains the neural network using the ADALINE learning rule with an early stopping condition.
@@ -401,12 +403,4 @@ class one_Layer(NeuralNetwork):
             if max_weight_change < tolerance:
                 print(f"Training stopped early at epoch {epoch} due to small weight change.")
                 break
-
-                
-                
-                
-                
-                
-
-
 
