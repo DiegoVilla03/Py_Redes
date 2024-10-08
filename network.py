@@ -404,3 +404,73 @@ class one_Layer(NeuralNetwork):
                 print(f"Training stopped early at epoch {epoch} due to small weight change.")
                 break
 
+
+class One_layer_Multiclass:
+    def __init__(self, n_features, n_classes, learning_rate=0.01, n_iter=1000, tol=1e-4):
+        self.n_features = n_features
+        self.n_classes = n_classes
+        self.learning_rate = learning_rate
+        self.n_iter = n_iter
+        self.tol = tol
+        self.weights = np.random.rand(n_classes, n_features + 1)
+
+    def generate_kessler_vectors(self, X, y):
+        n_samples = X.shape[0]
+        X_ext = np.hstack((np.ones((n_samples, 1)), X))
+        y_ext = []
+        for i in range(n_samples):
+            yi = np.zeros(self.n_classes)
+            yi[y[i]] = 1
+            y_ext.append(yi)
+        return np.array(X_ext), np.array(y_ext)
+
+    def train_perceptron(self, X, y):
+        X_ext, y_ext = self.generate_kessler_vectors(X, y)
+        n_samples = X_ext.shape[0]
+
+        for epoch in range(self.n_iter):
+            weight_changes = 0
+            for i in range(n_samples):
+                outputs = np.dot(self.weights, X_ext[i])
+                predicted = np.argmax(outputs)
+                actual = np.argmax(y_ext[i])
+
+                if predicted != actual:
+                    delta_weight_correct = self.learning_rate * X_ext[i]
+                    delta_weight_incorrect = self.learning_rate * X_ext[i]
+                    self.weights[actual] += delta_weight_correct
+                    self.weights[predicted] -= delta_weight_incorrect
+                    weight_changes += np.sum(np.abs(delta_weight_correct)) + np.sum(np.abs(delta_weight_incorrect))
+
+            if weight_changes < self.tol:
+                print(f"Perceptrón convergió en la época {epoch + 1}")
+                break
+
+    def train_adaline(self, X, y):
+        X_ext, y_ext = self.generate_kessler_vectors(X, y)
+        n_samples = X_ext.shape[0]
+
+        for epoch in range(self.n_iter):
+            weight_changes = 0
+            for i in range(n_samples):
+                net_input = np.dot(self.weights, X_ext[i])
+                errors = y_ext[i] - net_input
+                delta_weight = self.learning_rate * np.outer(errors, X_ext[i])
+                self.weights += delta_weight
+                weight_changes += np.sum(np.abs(delta_weight))
+
+            if weight_changes < self.tol:
+                print(f"ADALINE convergió en la época {epoch + 1}")
+                break
+
+    def predict(self, X):
+        if X.ndim == 1:  
+            X = X.reshape(1, -1)  
+        X_ext = np.hstack((np.ones((X.shape[0], 1)), X))  
+        predictions = []
+
+        for i in range(X_ext.shape[0]):
+            outputs = np.dot(self.weights, X_ext[i])
+            predictions.append(np.argmax(outputs))  
+        
+        return np.array(predictions)
