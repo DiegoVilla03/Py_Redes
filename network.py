@@ -453,14 +453,19 @@ class One_layer_Multiclass:
         for epoch in range(self.n_iter):
             weight_changes = 0
             for i in range(n_samples):
-                net_input = np.dot(self.weights, X_ext[i])
-                errors = y_ext[i] - net_input
-                delta_weight = self.learning_rate * np.outer(errors, X_ext[i])
-                self.weights += delta_weight
-                weight_changes += np.sum(np.abs(delta_weight))
+                outputs = np.dot(self.weights, X_ext[i])
+                predicted = np.argmax(outputs)
+                actual = np.argmax(y_ext[i])
+
+                
+                delta_weight_correct = self.learning_rate * X_ext[i]
+                delta_weight_incorrect = self.learning_rate * X_ext[i]
+                self.weights[actual] += delta_weight_correct
+                self.weights[predicted] -= delta_weight_incorrect
+                weight_changes += np.sum(np.abs(delta_weight_correct)) + np.sum(np.abs(delta_weight_incorrect))
 
             if weight_changes < self.tol:
-                print(f"ADALINE convergió en la época {epoch + 1}")
+                print(f"Perceptrón convergió en la época {epoch + 1}")
                 break
 
     def predict(self, X):
@@ -474,3 +479,10 @@ class One_layer_Multiclass:
             predictions.append(np.argmax(outputs))  
         
         return np.array(predictions)
+
+    def _normalize(self, X):
+        # Normalizar los datos a media 0 y desviación estándar 1
+        X_mean = np.mean(X, axis=0)
+        X_std = np.std(X, axis=0)
+        X_std[X_std == 0] = 1  # Evitar división por cero
+        return (X - X_mean) / X_std
