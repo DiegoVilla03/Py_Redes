@@ -406,79 +406,164 @@ class one_Layer(NeuralNetwork):
 
 
 class One_layer_Multiclass:
-    def __init__(self, n_features, n_classes, learning_rate=0.01, n_iter=1000, tol=1e-4):
+    def __init__(self, n_features, n_classes, learning_rate=0.1, n_iter=1000, tol=1e-4):
+        """
+        Inicializa la red con Perceptrón y ADALINE usando la construcción de Kesler.
+        :param n_features: Número de características de entrada.
+        :param n_classes: Número de clases.
+        :param learning_rate: Tasa de aprendizaje.
+        :param n_iter: Número de iteraciones.
+        :param tol: Tolerancia para la convergencia.
+        """
         self.n_features = n_features
         self.n_classes = n_classes
         self.learning_rate = learning_rate
         self.n_iter = n_iter
         self.tol = tol
-        self.weights = np.random.rand(n_classes, n_features + 1)
+        self.weights = None  # Se inicializan más tarde
 
-    def generate_kessler_vectors(self, X, y):
+    def add_bias_term(self, X):
+        """
+        Añade una columna de unos (para el término de bias) a la matriz de entrada X.
+        :param X: Matriz de entrada (n_samples, n_features)
+        :return: Matriz extendida con una columna adicional de unos (n_samples, n_features + 1)
+        """
         n_samples = X.shape[0]
-        X_ext = np.hstack((np.ones((n_samples, 1)), X))
-        y_ext = []
-        for i in range(n_samples):
-            yi = np.zeros(self.n_classes)
-            yi[y[i]] = 1
-            y_ext.append(yi)
-        return np.array(X_ext), np.array(y_ext)
+        bias = np.ones((n_samples, 1))  # Crear una columna de unos
+        X_extended = np.hstack((bias, X))  # Concatenar la columna de unos a X
+        return X_extended
 
-    def train_perceptron(self, X, y):
-        X_ext, y_ext = self.generate_kessler_vectors(X, y)
-        n_samples = X_ext.shape[0]
+    def generate_kesler_matrix(self, X, y):
+        """
+        Genera la matriz de Kesler a partir de los datos originales y sus etiquetas.
+        :param X: Matriz de datos de entrada (n_samples, n_features)
+        :param y: Etiquetas de clase (n_samples,)
+        :return: Matriz extendida de Kesler (n_samples * (num_classes - 1), n_features * num_classes + num_classes)
+        """
+        
+        # Obtener el número de muestras y características
+        n_samples, n_features = X.shape
+        
+        # Inicializar listas vacías para almacenar la matriz de Kesler y las etiquetas
+        kesler_matrix = []
+        kesler_labels = []
+        
+        # Extender las dimensiones de X añadiendo una columna de unos (para manejar el bias)
+        X_extended = self.add_bias_term(X)  # Añade una columna de unos al final de X para cada muestra
+        
+        # Para cada muestra de datos (iteramos sobre todas las filas de X)
+        for i in range(n_samples):
+            xi = X_extended[i]  
+            yi = y[i]           
+            
+            # Generar vectores de Kesler para cada clase incorrecta
+            # Este bucle anidado crea vectores de comparación entre la clase correcta y las demás clases
+            for j in range(self.n_classes):
+                if j != yi:  # Solo creamos vectores para las clases incorrectas
+                    # Crear un vector extendido de ceros, con dimensiones ((n_features + 1) * n_classes)
+                    # (n_features + 1) es para incluir el bias, y se multiplica por n_classes porque el vector representa todas las clases
+                    xij = np.zeros(((n_features + 1) * self.n_classes, ))  # Inicializamos el vector con ceros
+                    
+                    # Colocar el vector xi (extendido) en la posición de la clase correcta (yi)
+                    # Esto coloca xi (con bias) en el bloque correspondiente a la clase correcta en el vector de Kesler
+                    xij[yi * (n_features + 1):(yi + 1) * (n_features + 1)] = xi  # Añadimos xi en el bloque correspondiente a la clase correcta
+                    
+                    # Colocar -xi en la posición de la clase incorrecta (j)
+                    # Esto coloca -xi (con bias) en el bloque correspondiente a la clase incorrecta en el vector de Kesler
+                    xij[j * (n_features + 1):(j + 1) * (n_features + 1)] = -xi  # Añadimos -xi en el bloque de la clase incorrecta
+                    
+                    # Añadir el vector de Kesler a la matriz
+                    kesler_matrix.append(xij)
+                    
+                    kesler_labels.append(1)
+    
+        return np.array(kesler_matrix), np.array(kesler_labels)
+
+    def train_perceptron_kesler(self, X, y):
+        """
+        Entrena un Perceptrón utilizando la matriz de Kesler.
+        :param X: Datos de entrada (n_samples, n_features)
+        :param y: Etiquetas de clase (n_samples,)
+        """
+        # Generar la matriz extendida de Kesler
+        X_kesler, y_kesler = self.generate_kesler_matrix(X, y)
+        n_samples = X_kesler.shape[0]
+
+        # Inicialización de los pesos
+        self.weights = np.random.rand(X_kesler.shape[1])
 
         for epoch in range(self.n_iter):
             weight_changes = 0
             for i in range(n_samples):
-                outputs = np.dot(self.weights, X_ext[i])
-                predicted = np.argmax(outputs)
-                actual = np.argmax(y_ext[i])
-
-                if predicted != actual:
-                    delta_weight_correct = self.learning_rate * X_ext[i]
-                    delta_weight_incorrect = self.learning_rate * X_ext[i]
-                    self.weights[actual] += delta_weight_correct
-                    self.weights[predicted] -= delta_weight_incorrect
-                    weight_changes += np.sum(np.abs(delta_weight_correct)) + np.sum(np.abs(delta_weight_incorrect))
+                output = np.dot(self.weights, X_kesler[i])
+                
+                # Si la predicción es incorrecta (output <= 0), actualizamos los pesos
+                if output <= 0:
+                    delta_weight = self.learning_rate * X_kesler[i]
+                    self.weights += delta_weight
+                    weight_changes += np.sum(np.abs(delta_weight))
 
             if weight_changes < self.tol:
                 print(f"Perceptrón convergió en la época {epoch + 1}")
                 break
 
-    def train_adaline(self, X, y):
-        X_ext, y_ext = self.generate_kessler_vectors(X, y)
-        n_samples = X_ext.shape[0]
+    def train_adaline_kesler(self, X, y):
+        # Generar la matriz extendida de Kesler
+        X_kesler, y_kesler = self.generate_kesler_matrix(X, y)
+        n_samples = X_kesler.shape[0]
+
+        # Inicialización de los pesos
+        self.weights = np.random.rand(X_kesler.shape[1])
 
         for epoch in range(self.n_iter):
             weight_changes = 0
             for i in range(n_samples):
-                outputs = np.dot(self.weights, X_ext[i])
-                predicted = np.argmax(outputs)
-                actual = np.argmax(y_ext[i])
-
+                output = np.dot(self.weights, X_kesler[i])
                 
-                delta_weight_correct = self.learning_rate * X_ext[i]
-                delta_weight_incorrect = self.learning_rate * X_ext[i]
-                self.weights[actual] += delta_weight_correct
-                self.weights[predicted] -= delta_weight_incorrect
-                weight_changes += np.sum(np.abs(delta_weight_correct)) + np.sum(np.abs(delta_weight_incorrect))
+                # Limitar la salida para evitar overflow
+                output = np.clip(output, -500, 500)  # Evitar valores demasiado grandes
+                
+                # Calcular el error
+                error = y_kesler[i] - output
+                
+                # Actualización de los pesos
+                delta_weight = self.learning_rate * error * X_kesler[i]
+                self.weights += delta_weight
+                weight_changes += np.sum(np.abs(delta_weight))
 
+            # Verificar si hubo convergencia
             if weight_changes < self.tol:
-                print(f"Perceptrón convergió en la época {epoch + 1}")
+                print(f"ADALINE convergió en la época {epoch + 1}")
                 break
 
     def predict(self, X):
-        if X.ndim == 1:  
-            X = X.reshape(1, -1)  
-        X_ext = np.hstack((np.ones((X.shape[0], 1)), X))  
+        """
+        Realiza predicciones sobre nuevos datos utilizando los pesos entrenados.
+        :param X: Nuevos datos de entrada (n_samples, n_features)
+        :return: Predicciones (n_samples,)
+        """
+        n_samples, n_features = X.shape
         predictions = []
+        
+        for i in range(n_samples):
+            xi = X[i]
+            predicted_class = None
+            max_output = -np.inf
+            
+            # Evaluar el producto punto para cada clase
+            for j in range(self.n_classes):
+                xij = np.zeros(((n_features + 1) * self.n_classes, ))  # Crear vector extendido
+                xij[j * (n_features + 1):(j + 1) * (n_features + 1)] = np.append(1, xi)  # Asignar xi
+                
+                output = np.dot(self.weights, xij)
+                if output > max_output:
+                    max_output = output
+                    predicted_class = j
 
-        for i in range(X_ext.shape[0]):
-            outputs = np.dot(self.weights, X_ext[i])
-            predictions.append(np.argmax(outputs))  
+            predictions.append(predicted_class)
         
         return np.array(predictions)
+
 
     def _normalize(self, X):
         # Normalizar los datos a media 0 y desviación estándar 1
